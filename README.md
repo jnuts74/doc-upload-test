@@ -44,12 +44,12 @@ graph TD
     A --> F[Search Interface]
     F --> E
     
-    style A fill:#f9f,stroke:#333,stroke-width:2px
-    style B fill:#bbf,stroke:#333,stroke-width:2px
-    style C fill:#bbf,stroke:#333,stroke-width:2px
-    style D fill:#bbf,stroke:#333,stroke-width:2px
-    style E fill:#bfb,stroke:#333,stroke-width:2px
-    style F fill:#f9f,stroke:#333,stroke-width:2px
+    style A fill:#ff69b4,stroke:#333,stroke-width:2px,color:#fff
+    style B fill:#4169e1,stroke:#333,stroke-width:2px,color:#fff
+    style C fill:#4169e1,stroke:#333,stroke-width:2px,color:#fff
+    style D fill:#4169e1,stroke:#333,stroke-width:2px,color:#fff
+    style E fill:#228b22,stroke:#333,stroke-width:2px,color:#fff
+    style F fill:#ff69b4,stroke:#333,stroke-width:2px,color:#fff
 ```
 
 ### Process Flow
