@@ -35,7 +35,22 @@ A modern web application for document upload, vectorization, and semantic search
 ## 🏗️ System Architecture
 
 ### Architecture Diagram
-![System Architecture](https://i.imgur.com/8XZqY3N.png)
+```mermaid
+graph TD
+    A[User Interface/Streamlit] --> B[Document Upload]
+    B --> C[Text Processing/LangChain]
+    C --> D[OpenAI Embeddings]
+    D --> E[MongoDB Atlas/Vector Store]
+    A --> F[Search Interface]
+    F --> E
+    
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style B fill:#bbf,stroke:#333,stroke-width:2px
+    style C fill:#bbf,stroke:#333,stroke-width:2px
+    style D fill:#bbf,stroke:#333,stroke-width:2px
+    style E fill:#bfb,stroke:#333,stroke-width:2px
+    style F fill:#f9f,stroke:#333,stroke-width:2px
+```
 
 ### Process Flow
 1. **Document Upload**
