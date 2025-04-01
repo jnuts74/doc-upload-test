@@ -1,6 +1,7 @@
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
 import streamlit as st
+from utils.logger import logger
 
 class MongoDB:
     _instance = None
@@ -16,6 +17,7 @@ class MongoDB:
     def connect(self):
         """Connect or reconnect to MongoDB with current credentials"""
         if not st.session_state.get('mongodb_uri'):
+            logger.error("MongoDB connection string not found in settings")
             raise ConnectionFailure("MongoDB connection string not found in settings. Please configure it in the Settings page.")
             
         try:
@@ -27,9 +29,9 @@ class MongoDB:
             self.client.admin.command('ping')
             self.db = self.client['doc_upload_db']
             self.collection = self.db['documents']
-            print("Successfully connected to MongoDB!")
+            logger.info("Successfully connected to MongoDB")
         except Exception as e:
-            print(f"Failed to connect to MongoDB: {e}")
+            logger.error(f"Failed to connect to MongoDB: {e}")
             raise
 
     def ensure_connection(self):
@@ -43,10 +45,10 @@ class MongoDB:
         try:
             collection = self.ensure_connection()
             result = collection.insert_one(document_data)
-            print(f"Successfully stored document with ID: {result.inserted_id}")
+            logger.info(f"Successfully stored document with ID: {result.inserted_id}")
             return result
         except Exception as e:
-            print(f"Error storing document: {e}")
+            logger.error(f"Error storing document: {e}")
             raise
 
     def get_all_documents(self):
@@ -55,7 +57,7 @@ class MongoDB:
             collection = self.ensure_connection()
             return list(collection.find())
         except Exception as e:
-            print(f"Error retrieving documents: {e}")
+            logger.error(f"Error retrieving documents: {e}")
             raise
 
     def close(self):
@@ -66,9 +68,9 @@ class MongoDB:
                 self.client = None
                 self.db = None
                 self.collection = None
-                print("MongoDB connection closed")
+                logger.info("MongoDB connection closed")
         except Exception as e:
-            print(f"Error closing MongoDB connection: {e}")
+            logger.error(f"Error closing MongoDB connection: {e}")
 
 # Create a singleton instance
 mongodb = MongoDB() 

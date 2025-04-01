@@ -3,6 +3,7 @@ from utils.mongodb import mongodb
 from utils.openai_client import openai_client
 from utils.styles import get_css
 import os
+from pathlib import Path
 
 # Page config
 st.set_page_config(
@@ -44,14 +45,18 @@ uploaded_file = st.file_uploader("Choose a file to upload", type=["txt", "pdf", 
 
 if uploaded_file is not None:
     try:
-        # Create uploads directory if it doesn't exist
-        os.makedirs("uploads", exist_ok=True)
+        # Get the project root directory
+        project_root = Path(__file__).parent.parent
+        uploads_dir = project_root / "data" / "uploads"
+        processed_dir = project_root / "data" / "processed"
         
-        # Process the file
-        file_details = {"FileName": uploaded_file.name}
+        # Ensure directories exist
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+        processed_dir.mkdir(parents=True, exist_ok=True)
         
-        # Save the file
-        with open(os.path.join("uploads", uploaded_file.name), "wb") as f:
+        # Save the uploaded file
+        file_path = uploads_dir / uploaded_file.name
+        with open(file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
         
         # Get text content (implement your text extraction logic here)
@@ -69,7 +74,11 @@ if uploaded_file is not None:
                 "chunks": [{"text": text_content, "embedding": embedding}]
             })
             
-            st.success("✅ File uploaded successfully!")
+            # Move file to processed directory
+            processed_path = processed_dir / uploaded_file.name
+            file_path.rename(processed_path)
+            
+            st.success("✅ File uploaded and processed successfully!")
             
         except Exception as e:
             st.error(f"Error processing file: {str(e)}")
@@ -77,6 +86,8 @@ if uploaded_file is not None:
                 st.warning("Please check your OpenAI API key in Settings.")
             elif "MongoDB" in str(e):
                 st.warning("Please check your MongoDB connection string in Settings.")
+            # Clean up uploaded file if processing failed
+            file_path.unlink(missing_ok=True)
             
     except Exception as e:
         st.error(f"Error saving file: {str(e)}")

@@ -3,6 +3,7 @@ import httpx
 from openai import OpenAI
 from dotenv import load_dotenv
 import streamlit as st
+from utils.logger import logger
 
 # Load environment variables
 load_dotenv()
@@ -20,6 +21,7 @@ class OpenAIClient:
     def connect(self):
         """Connect or reconnect to OpenAI with current credentials"""
         if not st.session_state.get('openai_api_key'):
+            logger.error("OpenAI API key not found in settings")
             raise ValueError("OpenAI API key not found in settings. Please configure it in the Settings page.")
             
         try:
@@ -31,9 +33,9 @@ class OpenAIClient:
                 api_key=st.session_state.openai_api_key,
                 http_client=self.http_client
             )
-            print("Successfully connected to OpenAI!")
+            logger.info("Successfully connected to OpenAI")
         except Exception as e:
-            print(f"Failed to connect to OpenAI: {e}")
+            logger.error(f"Failed to connect to OpenAI: {e}")
             raise
             
     def ensure_connection(self):
@@ -44,12 +46,17 @@ class OpenAIClient:
     
     def get_embedding(self, text):
         """Get embedding for a text using OpenAI's API"""
-        client = self.ensure_connection()
-        response = client.embeddings.create(
-            input=text,
-            model="text-embedding-3-small"
-        )
-        return response.data[0].embedding
+        try:
+            client = self.ensure_connection()
+            response = client.embeddings.create(
+                input=text,
+                model="text-embedding-3-small"
+            )
+            logger.info("Successfully generated embedding")
+            return response.data[0].embedding
+        except Exception as e:
+            logger.error(f"Error generating embedding: {e}")
+            raise
         
     def close(self):
         """Close the OpenAI connection"""
@@ -58,9 +65,9 @@ class OpenAIClient:
                 self.http_client.close()
                 self.http_client = None
                 self.client = None
-                print("OpenAI connection closed")
+                logger.info("OpenAI connection closed")
         except Exception as e:
-            print(f"Error closing OpenAI connection: {e}")
+            logger.error(f"Error closing OpenAI connection: {e}")
 
 # Create a singleton instance
 openai_client = OpenAIClient() 

@@ -8,15 +8,16 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 class CredentialsManager:
     def __init__(self):
+        # Get project root directory
+        self.project_root = Path(__file__).parent.parent
+        
         # Create data directory if it doesn't exist
-        self.data_dir = Path.home() / '.docsearch'
-        self.data_dir.mkdir(exist_ok=True)
+        self.data_dir = self.project_root / "data" / "secure"
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         
-        # Database path
-        self.db_path = self.data_dir / 'credentials.db'
-        
-        # Encryption key file path
-        self.key_path = self.data_dir / '.key'
+        # Database and key paths
+        self.db_path = self.data_dir / "credentials.db"
+        self.key_path = self.data_dir / ".key"
         
         # Initialize encryption key
         self._init_encryption()
@@ -35,9 +36,9 @@ class CredentialsManager:
                 salt=salt,
                 iterations=480000,
             )
-            # Use machine-specific data as base for key
-            machine_data = str(os.getlogin() + os.name + str(os.cpu_count())).encode()
-            key = base64.urlsafe_b64encode(kdf.derive(machine_data))
+            # Use application-specific data as base for key
+            app_data = str(self.project_root.absolute()).encode()
+            key = base64.urlsafe_b64encode(kdf.derive(app_data))
             
             # Save key and salt
             with open(self.key_path, 'wb') as f:
@@ -58,7 +59,8 @@ class CredentialsManager:
                 CREATE TABLE IF NOT EXISTS credentials (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
     
@@ -67,8 +69,8 @@ class CredentialsManager:
         encrypted_value = self.cipher.encrypt(value.encode()).decode()
         with sqlite3.connect(self.db_path) as conn:
             conn.execute('''
-                INSERT OR REPLACE INTO credentials (key, value)
-                VALUES (?, ?)
+                INSERT OR REPLACE INTO credentials (key, value, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
             ''', (key, encrypted_value))
     
     def get_credential(self, key: str) -> str:
