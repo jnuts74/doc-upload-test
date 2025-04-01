@@ -1,195 +1,117 @@
 import streamlit as st
 from utils.mongodb import mongodb
-from datetime import datetime
-import json
+from utils.openai_client import openai_client
+from utils.styles import get_css
+import os
 
+# Page config
 st.set_page_config(
     page_title="Document Library",
     page_icon="📚",
     layout="wide"
 )
 
-# Custom CSS
-st.markdown("""
-    <style>
-    /* Main content area */
-    .main {
-        background-color: var(--background-color);
-    }
-    
-    /* Document cards */
-    .document-card {
-        background-color: var(--input-background-color);
-        border-radius: 10px;
-        padding: 20px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        transition: transform 0.2s;
-        cursor: pointer;
-    }
-    
-    .document-card:hover {
-        transform: translateY(-5px);
-    }
-    
-    /* Modal */
-    .modal {
-        display: none;
-        position: fixed;
-        z-index: 1000;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0,0,0,0.5);
-    }
-    
-    .modal-content {
-        background-color: var(--input-background-color);
-        margin: 5% auto;
-        padding: 20px;
-        border-radius: 10px;
-        width: 80%;
-        max-height: 80vh;
-        overflow-y: auto;
-        position: relative;
-    }
-    
-    .close-button {
-        position: absolute;
-        right: 20px;
-        top: 10px;
-        font-size: 28px;
-        cursor: pointer;
-        color: var(--text-color);
-    }
-    
-    /* Document metadata */
-    .metadata {
-        color: var(--text-color);
-        font-size: 0.9em;
-        margin-top: 10px;
-    }
-    
-    /* Document preview */
-    .preview {
-        color: var(--text-color);
-        margin-top: 10px;
-        font-style: italic;
-    }
-    
-    /* Grid layout */
-    .grid-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 20px;
-        padding: 20px;
-    }
-    </style>
-""", unsafe_allow_html=True)
+# Apply shared CSS
+st.markdown(f"<style>{get_css()}</style>", unsafe_allow_html=True)
 
-# JavaScript for modal functionality
-st.markdown("""
-    <script>
-    function openModal(documentId) {
-        document.getElementById(documentId).style.display = "block";
-    }
-    
-    function closeModal(documentId) {
-        document.getElementById(documentId).style.display = "none";
-    }
-    
-    // Close modal when clicking outside
-    window.onclick = function(event) {
-        if (event.target.classList.contains('modal')) {
-            event.target.style.display = "none";
-        }
-    }
-    </script>
-""", unsafe_allow_html=True)
-
+# Title
 st.title("📚 Document Library")
 
-# Search and filter options
-col1, col2 = st.columns([2, 1])
-with col1:
-    search_query = st.text_input("🔍 Search documents", placeholder="Search by filename or content...")
-with col2:
-    sort_by = st.selectbox(
-        "Sort by",
-        ["Newest First", "Oldest First", "Filename (A-Z)", "Filename (Z-A)"]
-    )
+# Check if credentials are configured
+if not st.session_state.get('mongodb_uri') or not st.session_state.get('openai_api_key'):
+    st.warning("⚠️ Please configure your API credentials in the Settings page before using the Document Library.")
+    st.markdown("""
+        To get started:
+        1. Go to the Settings page
+        2. Enter your OpenAI API key
+        3. Enter your MongoDB connection string
+        4. Save your settings
+        
+        [Go to Settings](Settings)
+    """)
+    st.stop()
 
-# Get documents from MongoDB
-if mongodb:
+# Create a container for the columns
+st.markdown('<div class="column-container">', unsafe_allow_html=True)
+
+# Left column - Upload
+st.markdown('<div class="column-left">', unsafe_allow_html=True)
+st.markdown('<div class="glass-container">', unsafe_allow_html=True)
+st.subheader("Upload Document")
+
+# File uploader
+uploaded_file = st.file_uploader("Choose a file to upload", type=["txt", "pdf", "doc", "docx"])
+
+if uploaded_file is not None:
     try:
-        documents = mongodb.get_all_documents()
+        # Create uploads directory if it doesn't exist
+        os.makedirs("uploads", exist_ok=True)
         
-        # Apply search filter if query exists
-        if search_query:
-            search_query = search_query.lower()
-            documents = [
-                doc for doc in documents 
-                if search_query in doc['filename'].lower() or
-                any(search_query in chunk['text'].lower() for chunk in doc['chunks'])
-            ]
+        # Process the file
+        file_details = {"FileName": uploaded_file.name}
         
-        # Apply sorting
-        if sort_by == "Newest First":
-            documents.sort(key=lambda x: x['created_at'], reverse=True)
-        elif sort_by == "Oldest First":
-            documents.sort(key=lambda x: x['created_at'])
-        elif sort_by == "Filename (A-Z)":
-            documents.sort(key=lambda x: x['filename'].lower())
-        elif sort_by == "Filename (Z-A)":
-            documents.sort(key=lambda x: x['filename'].lower(), reverse=True)
+        # Save the file
+        with open(os.path.join("uploads", uploaded_file.name), "wb") as f:
+            f.write(uploaded_file.getbuffer())
         
-        if documents:
-            st.markdown('<div class="grid-container">', unsafe_allow_html=True)
+        # Get text content (implement your text extraction logic here)
+        text_content = "Sample text content"  # Replace with actual text extraction
+        
+        try:
+            # Get embedding from OpenAI
+            embedding = openai_client.get_embedding(text_content)
             
-            for doc in documents:
-                # Create a unique ID for the modal
-                modal_id = f"modal_{doc['_id']}"
-                
-                # Format the date
-                created_at = doc['created_at'].strftime("%Y-%m-%d %H:%M")
-                
-                # Create the card
-                st.markdown(f"""
-                    <div class="document-card" onclick="openModal('{modal_id}')">
-                        <h3>{doc['filename']}</h3>
-                        <div class="metadata">
-                            <p>📅 Uploaded: {created_at}</p>
-                            <p>📄 Chunks: {len(doc['chunks'])}</p>
-                        </div>
-                        <div class="preview">
-                            {doc['chunks'][0]['text'][:200]}...
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-                # Create the modal
-                st.markdown(f"""
-                    <div id="{modal_id}" class="modal">
-                        <div class="modal-content">
-                            <span class="close-button" onclick="closeModal('{modal_id}')">&times;</span>
-                            <h2>{doc['filename']}</h2>
-                            <div class="metadata">
-                                <p>📅 Uploaded: {created_at}</p>
-                                <p>📄 Total Chunks: {len(doc['chunks'])}</p>
-                            </div>
-                            <div class="document-content">
-                                {''.join(chunk['text'] for chunk in doc['chunks'])}
-                            </div>
-                        </div>
-                    </div>
-                """, unsafe_allow_html=True)
+            # Store in MongoDB
+            mongodb.store_document({
+                "filename": uploaded_file.name,
+                "content": text_content,
+                "embedding": embedding,
+                "chunks": [{"text": text_content, "embedding": embedding}]
+            })
             
-            st.markdown('</div>', unsafe_allow_html=True)
-        else:
-            st.info("No documents found. Upload some documents to get started!")
+            st.success("✅ File uploaded successfully!")
+            
+        except Exception as e:
+            st.error(f"Error processing file: {str(e)}")
+            if "API key" in str(e):
+                st.warning("Please check your OpenAI API key in Settings.")
+            elif "MongoDB" in str(e):
+                st.warning("Please check your MongoDB connection string in Settings.")
             
     except Exception as e:
-        st.error(f"Error retrieving documents: {str(e)}")
-else:
-    st.warning("⚠️ MongoDB connection is not available.") 
+        st.error(f"Error saving file: {str(e)}")
+
+st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
+
+# Right column - Documents
+st.markdown('<div class="column-right">', unsafe_allow_html=True)
+st.markdown('<div class="glass-container">', unsafe_allow_html=True)
+st.subheader("Your Documents")
+
+try:
+    # Get all documents from MongoDB
+    documents = mongodb.get_all_documents()
+
+    if documents:
+        for doc in documents:
+            st.markdown(f"""
+                <div class="card">
+                    <h4>📄 {doc['filename']}</h4>
+                    <p>{doc['chunks'][0]['text'][:200]}...</p>
+                    <div class="metadata">
+                        🕒 Uploaded: {doc.get('created_at', 'Unknown date').strftime('%Y-%m-%d %H:%M') if isinstance(doc.get('created_at'), object) else 'Unknown date'}
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info("📭 No documents found. Upload some documents to get started!")
+
+except Exception as e:
+    st.error("Error loading documents. Please check your MongoDB connection in Settings.")
+
+st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
+
+# Close the container
+st.markdown('</div>', unsafe_allow_html=True) 
