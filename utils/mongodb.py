@@ -52,10 +52,22 @@ class MongoDB:
             raise
 
     def get_all_documents(self):
-        """Retrieve all documents from the collection"""
+        """Retrieve all documents from the collection with full details"""
         try:
             collection = self.ensure_connection()
-            return list(collection.find())
+            # Get documents and sort by created_at in descending order
+            cursor = collection.find().sort('created_at', -1)
+            
+            # Convert cursor to list and ensure created_at is properly formatted
+            documents = []
+            for doc in cursor:
+                # Handle documents that might not have created_at
+                if 'created_at' not in doc:
+                    doc['created_at'] = 'Unknown date'
+                documents.append(doc)
+            
+            logger.info(f"Retrieved {len(documents)} documents from MongoDB")
+            return documents
         except Exception as e:
             logger.error(f"Error retrieving documents: {e}")
             raise
@@ -71,6 +83,21 @@ class MongoDB:
                 logger.info("MongoDB connection closed")
         except Exception as e:
             logger.error(f"Error closing MongoDB connection: {e}")
+
+    def delete_document(self, document_id):
+        """Delete a document by its ID"""
+        try:
+            collection = self.ensure_connection()
+            result = collection.delete_one({"_id": document_id})
+            if result.deleted_count:
+                logger.info(f"Successfully deleted document with ID: {document_id}")
+                return True
+            else:
+                logger.warning(f"No document found with ID: {document_id}")
+                return False
+        except Exception as e:
+            logger.error(f"Error deleting document: {e}")
+            raise
 
 # Create a singleton instance
 mongodb = MongoDB() 
