@@ -3,7 +3,7 @@ from utils.styles import get_css
 
 # Page config
 st.set_page_config(
-    page_title="About",
+    page_title="About Project",
     page_icon="ℹ️",
     layout="wide"
 )
@@ -12,7 +12,7 @@ st.set_page_config(
 st.markdown(f"<style>{get_css()}</style>", unsafe_allow_html=True)
 
 # Title
-st.title("ℹ️ About Document Search")
+st.title("ℹ️ About Project")
 
 st.markdown("""
 A modern web application for document upload, vectorization, and semantic search using OpenAI embeddings and MongoDB Atlas.
