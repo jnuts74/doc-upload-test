@@ -178,7 +178,7 @@ st.markdown("""
 st.title("🔍 Document Search")
 
 # Check for API credentials
-if not os.getenv("MONGODB_URI") or not os.getenv("OPENAI_API_KEY"):
+if not st.session_state.get('mongodb_uri') or not st.session_state.get('openai_api_key'):
     st.warning("⚠️ Please configure your API credentials in the Settings page before searching.")
     st.markdown("[Go to Settings ➜](Settings)")
     st.stop()

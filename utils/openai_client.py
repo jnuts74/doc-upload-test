@@ -1,12 +1,7 @@
-import os
 import httpx
 from openai import OpenAI
-from dotenv import load_dotenv
 import streamlit as st
 from utils.logger import logger
-
-# Load environment variables
-load_dotenv()
 
 class OpenAIClient:
     _instance = None
