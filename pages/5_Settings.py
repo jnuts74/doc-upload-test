@@ -108,21 +108,35 @@ mongodb_uri = st.text_input(
 # Save button
 if st.button("💾 Save Settings", type="primary"):
     try:
-        # Save to SQLite
-        if sqlite_client.save_credentials(mongodb_uri, openai_key):
-            # Update session state
-            st.session_state['mongodb_uri'] = mongodb_uri
-            st.session_state['openai_api_key'] = openai_key
-            
-            # Try to connect to MongoDB with new credentials
-            try:
-                mongodb.connect()
-                st.success("✅ Settings saved successfully! MongoDB connection tested and working.")
-            except Exception as e:
-                st.error(f"Settings saved but MongoDB connection failed: {str(e)}")
-        else:
-            st.error("Failed to save settings.")
-            
+        with st.status("Saving and initializing...") as status:
+            status.write("Encrypting and saving credentials...")
+            # Save to SQLite
+            if sqlite_client.save_credentials(mongodb_uri, openai_key):
+                # Update session state
+                st.session_state['mongodb_uri'] = mongodb_uri
+                st.session_state['openai_api_key'] = openai_key
+                
+                status.write("Testing MongoDB connection...")
+                # Try to connect to MongoDB with new credentials
+                try:
+                    mongodb.connect()  # This will also initialize database and indexes
+                    status.write("Creating MongoDB indexes...")
+                    status.update(label="✅ Setup Complete!", state="complete", expanded=False)
+                    st.success("Settings saved and database initialized successfully!")
+                except Exception as e:
+                    status.update(label="❌ MongoDB Error", state="error")
+                    st.error(f"Settings saved but MongoDB connection failed: {str(e)}")
+                    st.info("""
+                    Common MongoDB Issues:
+                    - Network connectivity
+                    - IP whitelist settings in MongoDB Atlas
+                    - Database user permissions
+                    - Invalid connection string format
+                    """)
+            else:
+                status.update(label="❌ Save Error", state="error")
+                st.error("Failed to save settings.")
+                
     except Exception as e:
         st.error(f"Error saving settings: {str(e)}")
 
@@ -145,23 +159,81 @@ if st.button("🗑️ Clear Settings", type="secondary"):
 # Connection Status
 st.markdown("### 📡 Connection Status")
 
-# Check MongoDB connection
-mongodb_status = "🟢 Connected" if mongodb.is_connected() else "🔴 Disconnected"
-st.markdown(f"**MongoDB Status:** {mongodb_status}")
+# Create two columns for status indicators
+col1, col2 = st.columns(2)
 
-# OpenAI API Status (we could add a test call here if needed)
-openai_status = "🟢 Configured" if st.session_state.get('openai_api_key') else "🔴 Not Configured"
-st.markdown(f"**OpenAI API Status:** {openai_status}")
+with col1:
+    st.markdown("#### MongoDB Status")
+    mongodb_connected = mongodb.is_connected()
+    mongodb_status = {
+        "status": "🟢 Connected" if mongodb_connected else "🔴 Disconnected",
+        "details": []
+    }
+    
+    if mongodb_connected:
+        try:
+            doc_count = mongodb.collection.count_documents({})
+            index_count = len(list(mongodb.collection.list_indexes()))
+            mongodb_status["details"].extend([
+                f"Database: doc_upload_db",
+                f"Documents: {doc_count}",
+                f"Indexes: {index_count}"
+            ])
+        except Exception as e:
+            mongodb_status["details"].append(f"Error getting details: {str(e)}")
+    
+    st.markdown(f"**Status:** {mongodb_status['status']}")
+    for detail in mongodb_status["details"]:
+        st.markdown(f"- {detail}")
 
-# Add some helpful information
-st.markdown("### ℹ️ Information")
+with col2:
+    st.markdown("#### OpenAI API Status")
+    openai_configured = bool(st.session_state.get('openai_api_key'))
+    openai_status = "🟢 Configured" if openai_configured else "🔴 Not Configured"
+    st.markdown(f"**Status:** {openai_status}")
+    if openai_configured:
+        st.markdown("- API Key validated")
+        st.markdown("- Using text-embedding-3-small model")
+        st.markdown("- 1536-dimensional embeddings")
+
+# Security Information
+st.markdown("### 🔐 Security Information")
 st.markdown("""
-- The OpenAI API key is used for generating embeddings for semantic search
-- MongoDB is used for storing documents and their embeddings
-- Both credentials are required for the application to function properly
-- Credentials are stored securely in a local SQLite database
+- Credentials are stored in a secure SQLite database
+- Database location: `data/secure/credentials.db`
+- File permissions: 600 (owner read/write only)
+- Values are encrypted at rest
+- Machine-specific encryption key
 """)
 
-# Footer with version info
+# Troubleshooting
+with st.expander("🔧 Troubleshooting"):
+    st.markdown("""
+    #### MongoDB Connection Issues
+    1. Check your MongoDB Atlas settings:
+       - Is your IP whitelisted?
+       - Does your user have proper permissions?
+       - Is the connection string format correct?
+    
+    2. Common connection string format:
+       ```
+       mongodb+srv://username:password@cluster.xxxxx.mongodb.net/?retryWrites=true&w=majority
+       ```
+    
+    #### OpenAI API Issues
+    1. Verify your API key format:
+       - Should start with 'sk-'
+       - Should be about 51 characters long
+    
+    2. Check API key permissions:
+       - Embeddings access required
+       - Billing configured
+    """)
+
+# Footer
 st.markdown("---")
-st.markdown("**Version:** 1.0.0 | **Build:** 2024.03.14") 
+st.markdown("""
+<div style='text-align: center'>
+    <small>S.E.A.R.C.H. v1.0.0 | Build 2024.03.14</small>
+</div>
+""", unsafe_allow_html=True) 

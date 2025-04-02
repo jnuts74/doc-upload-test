@@ -45,13 +45,56 @@ class MongoDB:
             # Test the connection
             self.client.admin.command('ping')
             
-            # Use a fixed database name instead of trying to parse it from URI
-            self.db = self.client['doc_upload_db']
-            self.collection = self.db['documents']
+            # Initialize database and collections
+            self._initialize_database()
             
             logger.info("Successfully connected to MongoDB")
         except Exception as e:
             logger.error(f"Failed to connect to MongoDB: {e}")
+            raise
+
+    def _initialize_database(self):
+        """Initialize MongoDB database, collections, and indexes"""
+        try:
+            # Use a fixed database name
+            self.db = self.client['doc_upload_db']
+            self.collection = self.db['documents']
+            
+            # Create date-based index if it doesn't exist
+            self.collection.create_index([("created_at", -1)], background=True)
+            
+            # Check for existing vector search index
+            existing_indexes = self.collection.list_indexes()
+            has_vector_index = any(
+                idx.get("name") == "vector_search_index" 
+                for idx in existing_indexes
+            )
+            
+            if not has_vector_index:
+                logger.info("Creating vector search index...")
+                # Create vector search index
+                self.db.command({
+                    "createSearchIndex": "documents",
+                    "name": "vector_search_index",
+                    "definition": {
+                        "mappings": {
+                            "dynamic": True,
+                            "fields": {
+                                "chunks.embedding": {
+                                    "dimensions": 1536,
+                                    "similarity": "cosine",
+                                    "type": "knnVector"
+                                }
+                            }
+                        }
+                    }
+                })
+                logger.info("Vector search index created successfully")
+            
+            logger.info("MongoDB database initialization complete")
+            
+        except Exception as e:
+            logger.error(f"Error initializing MongoDB database: {e}")
             raise
 
     def ensure_connection(self):

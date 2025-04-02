@@ -34,11 +34,19 @@ ENV/
 data/uploads/*
 data/processed/*
 data/secure/*
+data/credentials.db  # Old location
 logs/*
 !data/uploads/.gitkeep
 !data/processed/.gitkeep
 !data/secure/.gitkeep
 !logs/.gitkeep
+
+# Credentials and Security
+.key
+*.key
+credentials.db
+data/secure/credentials.db
+data/secure/.key
 
 # Environment variables
 .env
