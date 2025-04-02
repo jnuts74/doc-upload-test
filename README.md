@@ -4,36 +4,66 @@ A modern web application for document upload, vectorization, and semantic search
 
 ## 🚀 Features
 
-- Document upload and processing
+- Document upload and processing (PDF & TXT support)
 - Text chunking and vectorization using OpenAI's text-embedding-3-small model
 - Vector storage in MongoDB Atlas
-- Semantic search capabilities
-- Dark mode support
-- Responsive design
-- Document library with card-based interface
-- Interactive document preview
-- Secure local credential management
+- Semantic search with relevance scoring
+- Dark mode UI with responsive design
+- Document library with grid layout
+- Interactive document preview and chunk viewer
+- Secure credential management with SQLite
+- Real-time connection status monitoring
+- Detailed logging system
 
 ## 🛠️ Technology Stack
 
 ### Frontend
 - **Streamlit**: Modern web application framework for Python
 - **Custom CSS**: Styled components and responsive design
+- **Grid Layout**: Responsive document card grid
+- **Dark Theme**: Consistent dark mode styling
 
 ### Backend
 - **Python 3.12**: Core programming language
 - **OpenAI API**: Text embedding generation using `text-embedding-3-small` model
 - **MongoDB Atlas**: Vector database for document storage and retrieval
-- **LangChain**: Text processing and chunking utilities
-- **SQLite**: Local encrypted credential storage
-- **Cryptography**: Secure credential encryption
+- **SQLite**: Local credential storage
+- **PyPDF2**: PDF text extraction
+- **Logging**: Structured logging system
+
+### Project Structure
+```
+doc-upload-test/
+├── Home.py                 # Main application entry
+├── pages/                  # Streamlit pages
+│   ├── 1_Document_Search.py
+│   ├── 2_Document_Library.py
+│   ├── 4_Logs.py
+│   └── 5_Settings.py
+├── utils/                  # Utility modules
+│   ├── document_processor.py
+│   ├── mongodb.py
+│   ├── openai_client.py
+│   ├── sqlite_client.py
+│   ├── styles.py
+│   └── logger.py
+├── data/                   # Data storage
+│   ├── processed/         # Processed documents
+│   ├── uploads/          # Temporary uploads
+│   └── credentials.db    # SQLite database
+├── logs/                   # Application logs
+├── static/                 # Static assets
+├── .streamlit/            # Streamlit configuration
+├── requirements.txt       # Python dependencies
+└── setup.sh              # Setup script
+```
 
 ### Key Libraries
 - `openai==1.12.0`: OpenAI API client
 - `pymongo==4.6.2`: MongoDB driver
-- `langchain==0.1.12`: Text processing utilities
-- `cryptography==42.0.5`: Credential encryption
-- `httpx==0.24.1`: Modern HTTP client
+- `streamlit==1.32.0`: Web interface
+- `PyPDF2==3.0.1`: PDF processing
+- `python-dotenv==1.0.0`: Environment management
 
 ## 🏗️ System Architecture
 
@@ -66,85 +96,132 @@ graph TD
 ### Process Flow
 1. **Credential Management**
    - User enters API credentials in Settings
-   - Credentials encrypted using machine-specific key
-   - Stored in local SQLite database
-   - Loaded into session state when needed
+   - Credentials stored in SQLite database
+   - Loaded into session state on application start
+   - Real-time connection status monitoring
 
 2. **Document Upload**
-   - User uploads document through Streamlit interface
-   - File is read and converted to text
+   - Support for PDF and TXT files
+   - Automatic file type detection
+   - Text extraction with PyPDF2 for PDFs
+   - Progress tracking during processing
 
 3. **Text Processing**
-   - Document is split into chunks using LangChain
-   - Chunk size: 1000 characters
-   - Overlap: 200 characters
-   - Ensures context preservation
+   - Smart text chunking with sentence boundary detection
+   - Configurable chunk size (1000 chars) and overlap (200 chars)
+   - Metadata preservation
+   - Error handling and logging
 
 4. **Embedding Generation**
-   - Each chunk is sent to OpenAI API
-   - Using `text-embedding-3-small` model
-   - Generates 1536-dimensional vectors
+   - Chunk vectorization using OpenAI API
+   - text-embedding-3-small model (1536 dimensions)
+   - Batch processing for efficiency
+   - Error recovery and retry logic
 
 5. **Storage**
-   - Vectors stored in MongoDB Atlas
-   - Document metadata preserved
-   - Timestamps added for tracking
+   - MongoDB Atlas vector storage
+   - Document metadata and chunks
+   - Automatic connection management
+   - Error handling and reconnection
 
 6. **Search Process**
-   - User enters search query
-   - Query converted to embedding
-   - Vector similarity search performed
-   - Results ranked by relevance
+   - Semantic search with relevance scoring
+   - Vector similarity calculation
+   - Results ranked by relevance percentage
+   - Interactive result previews
 
 ## 📊 Database Schemas
 
-### MongoDB Collection: `documents`
+### MongoDB Document Store
+```mermaid
+erDiagram
+    DOCUMENTS {
+        ObjectId _id
+        string filename
+        datetime created_at
+        array chunks
+    }
+    
+    CHUNK {
+        string text
+        float[] embedding
+    }
+    
+    DOCUMENTS ||--o{ CHUNK : contains
 
-```json
-{
-    "_id": ObjectId,
-    "filename": String,
-    "created_at": DateTime,
-    "chunks": [
-        {
-            "text": String,
-            "embedding": [Float]  // 1536-dimensional vector
-        }
-    ]
-}
+    %% Index definitions
+    DOCUMENTS }o--|| CREATED_AT_INDEX : "created_at: 1"
+    CHUNK }o--|| VECTOR_INDEX : "embedding: vectorSearch"
 ```
 
-### Local SQLite Credentials DB
-
-```sql
-CREATE TABLE credentials (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+### Local Credentials Store
+```mermaid
+erDiagram
+    CREDENTIALS {
+        string key PK
+        string value
+        datetime created_at
+    }
+    
+    %% Credential types
+    CREDENTIAL_TYPES {
+        string mongodb_uri
+        string openai_api_key
+    }
+    
+    CREDENTIALS ||--|| CREDENTIAL_TYPES : stores
 ```
 
-### Indexes
-- MongoDB: `created_at`: 1 (for sorting by upload date)
-- MongoDB: `chunks.embedding`: "vectorSearch" (for vector similarity search)
+### Data Relationships
+```mermaid
+graph TD
+    A[Document] -->|contains| B[Chunks]
+    B -->|has| C[Text Content]
+    B -->|has| D[Embedding Vector]
+    D -->|dimensions| E[1536]
+    
+    F[Credentials DB] -->|stores| G[MongoDB URI]
+    F -->|stores| H[OpenAI Key]
+    G -->|connects to| I[MongoDB Atlas]
+    H -->|authenticates| J[OpenAI API]
+    
+    style A fill:#4169e1,stroke:#333,stroke-width:2px,color:#fff
+    style B fill:#4169e1,stroke:#333,stroke-width:2px,color:#fff
+    style C fill:#daa520,stroke:#333,stroke-width:2px,color:#fff
+    style D fill:#daa520,stroke:#333,stroke-width:2px,color:#fff
+    style E fill:#228b22,stroke:#333,stroke-width:2px,color:#fff
+    style F fill:#ff69b4,stroke:#333,stroke-width:2px,color:#fff
+    style G fill:#4b0082,stroke:#333,stroke-width:2px,color:#fff
+    style H fill:#4b0082,stroke:#333,stroke-width:2px,color:#fff
+    style I fill:#228b22,stroke:#333,stroke-width:2px,color:#fff
+    style J fill:#228b22,stroke:#333,stroke-width:2px,color:#fff
+```
+
+### Key Features
+- **MongoDB Indexes**:
+  - `created_at`: Ascending index for efficient sorting
+  - `chunks.embedding`: Vector index for similarity search
+- **SQLite Features**:
+  - Single-table design for simplicity
+  - Key-value structure for flexibility
+  - Timestamp tracking for auditing
+- **Data Types**:
+  - Text content: UTF-8 encoded strings
+  - Embeddings: 1536-dimensional float arrays
+  - Timestamps: UTC datetime objects
 
 ## 🔐 Credential Management
 
-The application uses a secure local credential management system:
+The application uses SQLite for credential management:
 
-1. **Storage Location**: `~/.docsearch/credentials.db` (SQLite database)
-2. **Encryption**: 
-   - Machine-specific encryption key
-   - Generated using PBKDF2 with SHA256
-   - Stored in `~/.docsearch/.key`
-3. **Credentials Stored**:
-   - OpenAI API Key
-   - MongoDB Connection String
-4. **Security Features**:
-   - Encrypted at rest
-   - Never exposed in environment variables
-   - Session-based access
-   - Can be cleared via Settings page
+1. **Storage**: Local SQLite database in `data/credentials.db`
+2. **Schema**: Simple key-value store for credentials
+3. **Features**:
+   - Automatic database initialization
+   - Connection status monitoring
+   - Credential validation
+   - Clear credentials option
+   - Session state synchronization
 
 ## 🚀 Getting Started
 
