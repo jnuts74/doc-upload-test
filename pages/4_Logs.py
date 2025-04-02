@@ -2,15 +2,78 @@ import streamlit as st
 from pathlib import Path
 from datetime import datetime, timedelta
 import re
-from utils.styles import get_css
+from utils.styles import get_css, apply_custom_styles
 from utils.logger import logger
 
 # Page config
 st.set_page_config(
-    page_title="Application Logs",
+    page_title="System Logs",
     page_icon="📋",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
+
+# Apply custom styles
+apply_custom_styles()
+
+# Top Navigation
+st.markdown("""
+<style>
+    .top-nav {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 2rem;
+        padding: 1rem;
+        background-color: #1E1E1E;
+        border-radius: 10px;
+        margin-bottom: 2rem;
+    }
+    
+    .nav-item {
+        color: #FFFFFF;
+        text-decoration: none;
+        padding: 0.5rem 1rem;
+        border-radius: 5px;
+        transition: background-color 0.3s;
+        font-weight: 500;
+        cursor: pointer;
+    }
+    
+    .nav-item:hover {
+        background-color: #333333;
+    }
+    
+    .nav-item.active {
+        background-color: #4169e1;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Navigation
+nav_items = {
+    "🏠 Home": "Home",
+    "🔍 Search": "pages/1_Document_Search",
+    "📚 Library": "pages/2_Document_Library",
+    "⚙️ Settings": "pages/5_Settings",
+    "📋 Logs": ""
+}
+
+# Create navigation container
+nav_container = st.container()
+nav_cols = nav_container.columns(len(nav_items))
+
+# Add navigation items
+for idx, (label, page) in enumerate(nav_items.items()):
+    with nav_cols[idx]:
+        if st.button(
+            label,
+            key=f"nav_{page}",
+            use_container_width=True,
+            type="secondary" if page else "primary"
+        ):
+            if page:
+                st.switch_page(page + ".py")
 
 # Apply shared CSS
 st.markdown(f"<style>{get_css()}</style>", unsafe_allow_html=True)

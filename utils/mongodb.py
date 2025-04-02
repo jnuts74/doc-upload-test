@@ -2,6 +2,7 @@ from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
 import streamlit as st
 from utils.logger import logger
+import os
 
 class MongoDB:
     _instance = None
@@ -14,21 +15,40 @@ class MongoDB:
             cls._instance.collection = None
         return cls._instance
 
+    def is_connected(self):
+        """Check if we have a valid MongoDB connection"""
+        try:
+            if self.client:
+                # Test the connection
+                self.client.admin.command('ping')
+                return True
+            return False
+        except Exception:
+            return False
+
     def connect(self):
         """Connect or reconnect to MongoDB with current credentials"""
         if not st.session_state.get('mongodb_uri'):
-            logger.error("MongoDB connection string not found in settings")
-            raise ConnectionFailure("MongoDB connection string not found in settings. Please configure it in the Settings page.")
+            logger.error("MongoDB connection string not found in session state")
+            raise ConnectionFailure("MongoDB connection string not found. Please configure it in the Settings page.")
             
         try:
             if self.client:
                 self.close()
                 
-            self.client = MongoClient(st.session_state.mongodb_uri)
+            # Clean up the connection string and ensure proper database
+            mongodb_uri = st.session_state.mongodb_uri.strip()
+            
+            # Connect to MongoDB
+            self.client = MongoClient(mongodb_uri)
+            
             # Test the connection
             self.client.admin.command('ping')
+            
+            # Use a fixed database name instead of trying to parse it from URI
             self.db = self.client['doc_upload_db']
             self.collection = self.db['documents']
+            
             logger.info("Successfully connected to MongoDB")
         except Exception as e:
             logger.error(f"Failed to connect to MongoDB: {e}")
@@ -36,7 +56,7 @@ class MongoDB:
 
     def ensure_connection(self):
         """Ensure we have a valid connection before operations"""
-        if not self.client:
+        if not self.is_connected():
             self.connect()
         return self.collection
 
@@ -72,6 +92,14 @@ class MongoDB:
             logger.error(f"Error retrieving documents: {e}")
             raise
 
+    def has_documents(self):
+        """Check if there are any documents in the database."""
+        try:
+            return self.collection.count_documents({}) > 0
+        except Exception as e:
+            logger.error(f"Error checking for documents: {e}")
+            return False
+
     def close(self):
         """Close the MongoDB connection"""
         try:
@@ -97,6 +125,86 @@ class MongoDB:
                 return False
         except Exception as e:
             logger.error(f"Error deleting document: {e}")
+            raise
+
+    def search_documents(self, query_embedding, limit=5):
+        """Search documents using vector similarity"""
+        try:
+            collection = self.ensure_connection()
+            
+            # Aggregate pipeline for vector search
+            pipeline = [
+                # Match only documents that have chunks
+                {
+                    "$match": {
+                        "chunks": {"$exists": True, "$ne": []}
+                    }
+                },
+                
+                # Unwind the chunks array to search within each chunk
+                {"$unwind": "$chunks"},
+                
+                # Match only chunks that have embeddings
+                {
+                    "$match": {
+                        "chunks.embedding": {"$exists": True}
+                    }
+                },
+                
+                # Add a similarity score using dot product
+                {
+                    "$addFields": {
+                        "similarity": {
+                            "$reduce": {
+                                "input": {"$range": [0, {"$size": "$chunks.embedding"}]},
+                                "initialValue": 0,
+                                "in": {
+                                    "$add": [
+                                        "$$value",
+                                        {"$multiply": [
+                                            {"$arrayElemAt": ["$chunks.embedding", "$$this"]},
+                                            {"$arrayElemAt": [query_embedding, "$$this"]}
+                                        ]}
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                },
+                
+                # Sort by similarity score (highest first)
+                {"$sort": {"similarity": -1}},
+                
+                # Group back by document to get best matching chunks
+                {
+                    "$group": {
+                        "_id": "$_id",
+                        "filename": {"$first": "$filename"},
+                        "content": {"$first": "$content"},
+                        "created_at": {"$first": "$created_at"},
+                        "similarity": {"$max": "$similarity"},
+                        "best_chunk": {"$first": "$chunks.text"},
+                    }
+                },
+                
+                # Final sort of documents by best chunk similarity
+                {"$sort": {"similarity": -1}},
+                
+                # Limit results
+                {"$limit": limit}
+            ]
+            
+            results = list(collection.aggregate(pipeline))
+            
+            if not results:
+                logger.warning("No documents found with valid chunks and embeddings")
+                return []
+            
+            logger.info(f"Found {len(results)} documents matching the query")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Error searching documents: {e}")
             raise
 
 # Create a singleton instance
