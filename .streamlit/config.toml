@@ -1,0 +1,14 @@
+[theme]
+primaryColor = "#4169e1"  # Royal Blue
+backgroundColor = "#0e1117"  # Dark background
+secondaryBackgroundColor = "#1a1f29"  # Slightly lighter dark
+textColor = "#fafafa"  # Almost white
+font = "sans serif"
+
+[server]
+maxUploadSize = 100
+enableXsrfProtection = true
+enableCORS = false
+
+[browser]
+gatherUsageStats = false

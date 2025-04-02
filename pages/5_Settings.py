@@ -175,7 +175,7 @@ with col1:
             doc_count = mongodb.collection.count_documents({})
             index_count = len(list(mongodb.collection.list_indexes()))
             mongodb_status["details"].extend([
-                f"Database: doc_upload_db",
+                f"Database: searchDb",
                 f"Documents: {doc_count}",
                 f"Indexes: {index_count}"
             ])

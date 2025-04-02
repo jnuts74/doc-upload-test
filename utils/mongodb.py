@@ -1,8 +1,10 @@
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
+from pymongo.operations import SearchIndexModel
 import streamlit as st
 from utils.logger import logger
 import os
+import time
 
 class MongoDB:
     _instance = None
@@ -54,47 +56,45 @@ class MongoDB:
             raise
 
     def _initialize_database(self):
-        """Initialize MongoDB database, collections, and indexes"""
+        """Initialize database and create necessary indexes"""
         try:
-            # Use a fixed database name
-            self.db = self.client['doc_upload_db']
-            self.collection = self.db['documents']
+            # Create database and collection if they don't exist
+            self.db = self.client[self.db_name]
+            self.collection = self.db[self.collection_name]
             
-            # Create date-based index if it doesn't exist
-            self.collection.create_index([("created_at", -1)], background=True)
+            # Create date-based index for efficient querying
+            self.collection.create_index([("created_at", 1)])
             
-            # Check for existing vector search index
-            existing_indexes = self.collection.list_indexes()
-            has_vector_index = any(
-                idx.get("name") == "vector_search_index" 
-                for idx in existing_indexes
+            # Create vector search index using the exact working template
+            search_index_model = SearchIndexModel(
+                definition={
+                    "fields": [{
+                        "type": "vector",
+                        "numDimensions": 1536,
+                        "path": "chunks.embedding",
+                        "similarity": "cosine"
+                    }]
+                },
+                name="vector-search-index",
+                type="vectorSearch"
             )
             
-            if not has_vector_index:
-                logger.info("Creating vector search index...")
-                # Create vector search index
-                self.db.command({
-                    "createSearchIndex": "documents",
-                    "name": "vector_search_index",
-                    "definition": {
-                        "mappings": {
-                            "dynamic": True,
-                            "fields": {
-                                "chunks.embedding": {
-                                    "dimensions": 1536,
-                                    "similarity": "cosine",
-                                    "type": "knnVector"
-                                }
-                            }
-                        }
-                    }
-                })
-                logger.info("Vector search index created successfully")
+            result = self.collection.create_search_index(model=search_index_model)
+            logger.info(f"New search index named {result} is building.")
             
-            logger.info("MongoDB database initialization complete")
+            # Wait for initial sync to complete
+            logger.info("Polling to check if the index is ready. This may take up to a minute.")
+            predicate = lambda index: index.get("queryable") is True
+            
+            while True:
+                indices = list(self.collection.list_search_indexes(result))
+                if len(indices) and predicate(indices[0]):
+                    break
+                time.sleep(5)
+            logger.info(f"{result} is ready for querying.")
             
         except Exception as e:
-            logger.error(f"Error initializing MongoDB database: {e}")
+            logger.error(f"Error initializing database: {e}")
             raise
 
     def ensure_connection(self):
