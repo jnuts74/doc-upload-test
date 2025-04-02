@@ -1,6 +1,34 @@
-# Document Search & Vectorization Application
+# S.E.A.R.C.H.
+## Semantic Embeddings And Retrieval Cloud Hub
 
-A modern web application for document upload, vectorization, and semantic search using OpenAI embeddings and MongoDB Atlas.
+<div align="center">
+
+```mermaid
+graph LR
+    S[Semantic] --> E[Embeddings]
+    E --> A[And]
+    A --> R[Retrieval]
+    R --> C[Cloud]
+    C --> H[Hub]
+    
+    style S fill:#4169e1,stroke:#333,stroke-width:2px,color:#fff
+    style E fill:#daa520,stroke:#333,stroke-width:2px,color:#fff
+    style A fill:#4b0082,stroke:#333,stroke-width:2px,color:#fff
+    style R fill:#ff69b4,stroke:#333,stroke-width:2px,color:#fff
+    style C fill:#228b22,stroke:#333,stroke-width:2px,color:#fff
+    style H fill:#4169e1,stroke:#333,stroke-width:2px,color:#fff
+```
+
+A modern cloud-native application for intelligent document processing and semantic search, powered by OpenAI embeddings and MongoDB Atlas vector search.
+
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.32.0-FF4B4B.svg)](https://streamlit.io)
+[![OpenAI](https://img.shields.io/badge/OpenAI-1.12.0-412991.svg)](https://openai.com)
+[![MongoDB](https://img.shields.io/badge/MongoDB-4.6.2-4DB33D.svg)](https://www.mongodb.com)
+
+</div>
+
+---
 
 ## 🚀 Features
 
