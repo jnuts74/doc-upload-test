@@ -15,6 +15,8 @@ class MongoDB:
             cls._instance.client = None
             cls._instance.db = None
             cls._instance.collection = None
+            cls._instance.db_name = "searchDb"
+            cls._instance.collection_name = "documents"
         return cls._instance
 
     def is_connected(self):
@@ -65,37 +67,47 @@ class MongoDB:
             # Create date-based index for efficient querying
             self.collection.create_index([("created_at", 1)])
             
-            # Create vector search index using the exact working template
-            search_index_model = SearchIndexModel(
-                definition={
-                    "fields": [{
-                        "type": "vector",
-                        "numDimensions": 1536,
-                        "path": "chunks.embedding",
-                        "similarity": "cosine"
-                    }]
-                },
-                name="vector-search-index",
-                type="vectorSearch"
-            )
+            # Check if vector search index already exists
+            existing_indexes = list(self.collection.list_search_indexes())
+            index_exists = any(idx.get("name") == "vector-search-index" for idx in existing_indexes)
             
-            result = self.collection.create_search_index(model=search_index_model)
-            logger.info(f"New search index named {result} is building.")
-            
-            # Wait for initial sync to complete
-            logger.info("Polling to check if the index is ready. This may take up to a minute.")
-            predicate = lambda index: index.get("queryable") is True
-            
-            while True:
-                indices = list(self.collection.list_search_indexes(result))
-                if len(indices) and predicate(indices[0]):
-                    break
-                time.sleep(5)
-            logger.info(f"{result} is ready for querying.")
+            if not index_exists:
+                # Create vector search index using the exact working template
+                search_index_model = SearchIndexModel(
+                    definition={
+                        "fields": [{
+                            "type": "vector",
+                            "numDimensions": 1536,
+                            "path": "chunks.embedding",
+                            "similarity": "cosine"
+                        }]
+                    },
+                    name="vector-search-index",
+                    type="vectorSearch"
+                )
+                
+                result = self.collection.create_search_index(model=search_index_model)
+                logger.info(f"New search index named {result} is building.")
+                
+                # Wait for initial sync to complete
+                logger.info("Polling to check if the index is ready. This may take up to a minute.")
+                predicate = lambda index: index.get("queryable") is True
+                
+                while True:
+                    indices = list(self.collection.list_search_indexes(result))
+                    if len(indices) and predicate(indices[0]):
+                        break
+                    time.sleep(5)
+                logger.info(f"{result} is ready for querying.")
+            else:
+                logger.info("Vector search index already exists")
             
         except Exception as e:
-            logger.error(f"Error initializing database: {e}")
-            raise
+            if "IndexAlreadyExists" in str(e):
+                logger.info("Vector search index already exists")
+            else:
+                logger.error(f"Error initializing database: {e}")
+                raise
 
     def ensure_connection(self):
         """Ensure we have a valid connection before operations"""

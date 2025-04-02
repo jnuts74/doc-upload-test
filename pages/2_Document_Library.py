@@ -373,7 +373,7 @@ try:
                             col1, col2 = st.columns(2)
                             with col1:
                                 if st.button("👁️ View", key=f"view_{str(doc['_id'])}", use_container_width=True):
-                                    st.session_state.viewing_document = str(doc['_id'])
+                                    st.session_state.viewing_document = doc['filename']
                                     st.experimental_rerun()
                             with col2:
                                 if st.button("🗑️ Delete", key=f"delete_{str(doc['_id'])}", type="primary", use_container_width=True):
