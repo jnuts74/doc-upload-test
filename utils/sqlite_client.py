@@ -2,9 +2,6 @@ import sqlite3
 from pathlib import Path
 from utils.logger import logger
 from cryptography.fernet import Fernet
-import base64
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import os
 
 class SQLiteClient:
@@ -13,55 +10,67 @@ class SQLiteClient:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(SQLiteClient, cls).__new__(cls)
-            cls._instance.client = None
+            # Initialize paths first
+            cls._instance.project_root = Path(__file__).parent.parent
+            cls._instance.secure_dir = cls._instance.project_root / "data" / "secure"
+            cls._instance.db_path = cls._instance.secure_dir / "credentials.db"
+            cls._instance.key_path = cls._instance.secure_dir / ".key"
+            
+            # Ensure the secure directory exists with proper permissions
+            cls._instance.secure_dir.mkdir(parents=True, exist_ok=True)
+            os.chmod(cls._instance.secure_dir, 0o700)  # Restrictive permissions
+            
+            # Initialize encryption and database
             cls._instance._init_encryption()
+            cls._instance._init_db()
         return cls._instance
     
     def __init__(self):
-        # Get the project root directory (parent of utils)
-        self.project_root = Path(__file__).parent.parent
-        self.secure_dir = self.project_root / "data" / "secure"
-        self.db_path = self.secure_dir / "credentials.db"
-        self.key_path = self.secure_dir / ".key"
-        
-        # Ensure the secure directory exists with proper permissions
-        self.secure_dir.mkdir(parents=True, exist_ok=True)
-        os.chmod(self.secure_dir, 0o700)  # Restrictive permissions
-        
-        # Initialize the database
-        self._init_db()
+        # All initialization is done in __new__
+        pass
     
     def _init_encryption(self):
         """Initialize or load encryption key"""
         try:
+            # Always ensure we have a valid key
             if self.key_path.exists():
-                # Load existing key
-                with open(self.key_path, 'rb') as key_file:
-                    self.key = key_file.read()
+                try:
+                    # Try to load and validate existing key
+                    with open(self.key_path, 'rb') as key_file:
+                        key = key_file.read().strip()
+                        # Test if key is valid
+                        Fernet(key)
+                        self.key = key
+                except Exception:
+                    # If key is invalid, generate new one
+                    logger.warning("Invalid encryption key found, generating new key")
+                    self.key = Fernet.generate_key()
+                    with open(self.key_path, 'wb') as key_file:
+                        key_file.write(self.key)
             else:
                 # Generate new key
-                salt = os.urandom(16)
-                kdf = PBKDF2HMAC(
-                    algorithm=hashes.SHA256(),
-                    length=32,
-                    salt=salt,
-                    iterations=480000,
-                )
-                # Use machine-specific info as base for key
-                machine_info = f"{os.uname().nodename}{os.uname().machine}"
-                key = base64.urlsafe_b64encode(kdf.derive(machine_info.encode()))
-                
+                self.key = Fernet.generate_key()
                 # Save key securely
                 with open(self.key_path, 'wb') as key_file:
-                    key_file.write(key)
-                os.chmod(self.key_path, 0o600)  # Read/write for owner only
-                self.key = key
-                
+                    key_file.write(self.key)
+            
+            # Set proper permissions
+            os.chmod(self.key_path, 0o600)
+            
+            # Initialize Fernet cipher
             self.cipher_suite = Fernet(self.key)
             logger.info("Encryption initialized successfully")
+            
         except Exception as e:
             logger.error(f"Error initializing encryption: {e}")
-            raise
+            # If anything goes wrong, try to clean up
+            if hasattr(self, 'key_path') and self.key_path.exists():
+                try:
+                    os.remove(self.key_path)
+                    logger.info("Removed invalid key file")
+                except Exception:
+                    pass
+            raise ValueError("Failed to initialize encryption. Please restart the application.")
     
     def _init_db(self):
         """Initialize the SQLite database with required tables"""
@@ -110,7 +119,11 @@ class SQLiteClient:
                 # Convert results to dictionary and decrypt values
                 credentials = {}
                 for key, encrypted_value in results:
-                    credentials[key] = self._decrypt(encrypted_value)
+                    try:
+                        credentials[key] = self._decrypt(encrypted_value)
+                    except Exception as e:
+                        logger.error(f"Error decrypting credential {key}: {e}")
+                        return None
                 
                 # Return None if no credentials found
                 if not credentials:

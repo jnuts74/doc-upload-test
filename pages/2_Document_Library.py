@@ -93,15 +93,41 @@ if 'viewing_document' not in st.session_state:
 # Initialize SQLite and load credentials
 sqlite_client = SQLiteClient()
 credentials = sqlite_client.get_credentials()
-if credentials:
-    st.session_state['mongodb_uri'] = credentials['mongodb_uri']
-    st.session_state['openai_api_key'] = credentials['openai_api_key']
+
+# Check credentials and initialize connections
+if not credentials:
+    st.warning("⚠️ Please configure your API credentials in the Settings page before using the Document Library.")
+    st.markdown("""
+        To get started:
+        1. Go to the Settings page
+        2. Enter your OpenAI API key
+        3. Enter your MongoDB connection string
+        4. Save your settings
+        
+        [Go to Settings ➜](Settings)
+    """)
+    st.stop()
+
+# Update session state with credentials
+st.session_state['mongodb_uri'] = credentials['mongodb_uri']
+st.session_state['openai_api_key'] = credentials['openai_api_key']
 
 # Initialize MongoDB connection at the start
 try:
     mongodb.connect()  # This will use the session state credentials that we just loaded
 except Exception as e:
     st.error(f"Error connecting to MongoDB: {str(e)}")
+    st.info("""
+    Common MongoDB Connection Issues:
+    - Network connectivity
+    - IP whitelist settings in MongoDB Atlas
+    - Database user permissions
+    - Invalid connection string format
+    
+    Please check your settings and try again.
+    [Go to Settings ➜](Settings)
+    """)
+    st.stop()
 
 # Title
 st.title("📚 Document Library")
