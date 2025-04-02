@@ -134,42 +134,74 @@ graph TD
 
 ### MongoDB Document Store
 ```mermaid
-erDiagram
-    DOCUMENTS {
+classDiagram
+    class Documents {
+        <<MongoDB Collection>>
         ObjectId _id
         string filename
         datetime created_at
         array chunks
+        +addDocument()
+        +getDocument()
+        +deleteDocument()
     }
     
-    CHUNK {
+    class Chunk {
+        <<Embedded Document>>
         string text
-        float[] embedding
+        float[1536] embedding
+        +generateEmbedding()
+        +searchSimilar()
     }
     
-    DOCUMENTS ||--o{ CHUNK : contains
+    class Indexes {
+        <<Collection Indexes>>
+        +created_at: 1
+        +chunks.embedding: vectorSearch
+    }
 
-    %% Index definitions
-    DOCUMENTS }o--|| CREATED_AT_INDEX : "created_at: 1"
-    CHUNK }o--|| VECTOR_INDEX : "embedding: vectorSearch"
+    Documents *-- Chunk : contains
+    Documents -- Indexes : uses
+    
+    %% Styling
+    style Documents fill:#4169e1,stroke:#333,stroke-width:2px,color:#fff
+    style Chunk fill:#daa520,stroke:#333,stroke-width:2px,color:#fff
+    style Indexes fill:#228b22,stroke:#333,stroke-width:2px,color:#fff
 ```
 
 ### Local Credentials Store
 ```mermaid
-erDiagram
-    CREDENTIALS {
+classDiagram
+    class Credentials {
+        <<SQLite Table>>
         string key PK
         string value
         datetime created_at
+        +saveCredential()
+        +getCredential()
+        +clearCredentials()
     }
     
-    %% Credential types
-    CREDENTIAL_TYPES {
-        string mongodb_uri
-        string openai_api_key
+    class CredentialTypes {
+        <<Valid Keys>>
+        mongodb_uri
+        openai_api_key
     }
     
-    CREDENTIALS ||--|| CREDENTIAL_TYPES : stores
+    class Security {
+        <<Features>>
+        +validateCredentials()
+        +monitorConnection()
+        +syncSessionState()
+    }
+
+    Credentials -- CredentialTypes : validates
+    Credentials -- Security : implements
+    
+    %% Styling
+    style Credentials fill:#ff69b4,stroke:#333,stroke-width:2px,color:#fff
+    style CredentialTypes fill:#4b0082,stroke:#333,stroke-width:2px,color:#fff
+    style Security fill:#228b22,stroke:#333,stroke-width:2px,color:#fff
 ```
 
 ### Data Relationships
@@ -237,12 +269,15 @@ The application uses SQLite for credential management:
    ```
 4. Run the application:
    ```bash
-   streamlit run app.py
+   streamlit run Home.py
    ```
 5. Configure your credentials in the Settings page:
    - Enter your OpenAI API key
    - Enter your MongoDB connection string
    - Click "Save Settings"
+6. The application will be available at:
+   - Local URL: http://localhost:8501
+   - Network URL: http://192.168.x.x:8501 (for local network access)
 
 ## 🔮 Future Enhancements
 
